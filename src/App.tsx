@@ -1,21 +1,22 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { usePollinationsText } from '@pollinations/react';
 import ReactMarkdown from 'react-markdown';
 import ImageInput from './components/ImageInput';
 
 function App() {
   const [image, setImage] = useState<string | null>(null);
-  const [language, setLanguage] = useState<string>('English');
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [language, setLanguage] = useState<string>('עברית');
   const [credits, setCredits] = useState<number>(0);
   const [promptKey, setPromptKey] = useState<number>(0);
   const [currentPrompt, setCurrentPrompt] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [petDescription, setPetDescription] = useState<string>('');
-  const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'analyzing'>('idle');
+  const [status, setStatus] = useState<'loading' | 'ready' | 'analyzing'>('loading');
   const [loadProgress, setLoadProgress] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [userFeedback, setUserFeedback] = useState<string>('');
-  
+  const [names, setNames] = useState<string | null>(null);
+
   const worker = useRef<Worker | null>(null);
 
   // Initialize worker
@@ -26,7 +27,7 @@ function App() {
 
     const onMessage = (e: MessageEvent) => {
       const { status: msgStatus, data, result } = e.data;
-      
+
       switch (msgStatus) {
         case 'loading':
           setStatus('loading');
@@ -77,11 +78,10 @@ function App() {
     setCredits(normalized);
   };
 
-  // Analyze image when it changes
+  // Analyze image when it changes or when model becomes ready
   useEffect(() => {
-    if (image && status === 'ready') {
+    if (image && status === 'ready' && !petDescription && !isAnalyzing) {
       setIsAnalyzing(true);
-      setPetDescription('');
       worker.current?.postMessage({
         type: 'run',
         data: {
@@ -90,37 +90,60 @@ function App() {
         }
       });
     }
-  }, [image, status]);
+  }, [image, status, petDescription, isAnalyzing]);
 
-  // Generate name suggestions using Pollinations with pet description
-  const namePrompt = petDescription && currentPrompt
-    ? `Based on this pet: "${petDescription}"${userFeedback ? `. User feedback: "${userFeedback}"` : ''}. Suggest exactly 10 pet names in ${language}. Format:
+  // Generate names with manual fetch when promptKey changes
+  useEffect(() => {
+    if (!petDescription || !currentPrompt || promptKey === 0) return;
+
+    const generateNames = async () => {
+      try {
+        const userContent = `Based on this pet: "${petDescription}"${userFeedback ? `. User feedback: "${userFeedback}"` : ''}. Suggest exactly 10 pet names in ${language}. Format:
 1. Name - one sentence why
 2. Name - one sentence why
 (etc.)
-Be concise. No introduction or conclusion.`
-    : '';
+Be concise. No introduction or conclusion.`;
 
-  const names = usePollinationsText(namePrompt || null as any, {
-    seed: promptKey,
-    model: 'openai',
-    systemPrompt: 'You are a helpful pet naming assistant. Provide only the requested names list. Do not include any advertisements, promotional content, or mentions of Pollinations.AI.',
-  });
+        const response = await fetch('https://text.pollinations.ai/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [
+              {
+                role: 'system',
+                content: 'You are a helpful pet naming assistant. Provide only the requested names list. Do not include any advertisements, promotional content, or mentions of Pollinations.AI.'
+              },
+              {
+                role: 'user',
+                content: userContent
+              }
+            ],
+            seed: promptKey,
+            model: 'openai',
+            jsonMode: false
+          })
+        });
+
+        const text = await response.text();
+        setNames(text);
+        setIsGenerating(false);
+      } catch (error) {
+        console.error('Error generating names:', error);
+        setIsGenerating(false);
+      }
+    };
+
+    generateNames();
+  }, [promptKey, petDescription, currentPrompt, userFeedback, language]);
 
   const handleGenerateNames = useCallback(() => {
     if (!image || credits <= 0 || !petDescription) return;
     updateCredits(credits - 1);
     setIsGenerating(true);
+    setNames(null); // Clear old names
     setCurrentPrompt(`Generate pet names`);
     setPromptKey(prev => prev + 1);
-  }, [image, credits, petDescription, userFeedback]);
-
-  // Track when generation completes
-  useEffect(() => {
-    if (names && currentPrompt && isGenerating) {
-      setIsGenerating(false);
-    }
-  }, [names, currentPrompt, isGenerating]);
+  }, [image, credits, petDescription]);
 
   // Detect RTL for Hebrew
   const isRTL = language.toLowerCase().includes('עברית') || language.toLowerCase().includes('hebrew') || language.toLowerCase() === 'he';
@@ -168,11 +191,6 @@ Be concise. No introduction or conclusion.`
                 <span className="font-semibold text-amber-900 dark:text-amber-100">{credits}</span>
                 <span className="text-xs text-amber-700 dark:text-amber-300">credits</span>
               </div>
-              <button
-                onClick={() => updateCredits(credits + 100)}
-                className="px-3 py-1.5 bg-linear-to-r from-purple-600 to-pink-600 text-white text-sm rounded-full font-medium hover:shadow-lg hover:scale-105 transition-all duration-200">
-                + 100 Free
-              </button>
             </div>
           </div>
         </div>
@@ -216,24 +234,39 @@ Be concise. No introduction or conclusion.`
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
                     <span>📸</span> Upload Your Pet's Photo
                   </label>
-                  <ImageInput
-                    className="w-full h-64 rounded-xl border-2 border-dashed border-purple-300 dark:border-purple-600 hover:border-purple-500 transition-all cursor-pointer overflow-hidden"
-                    onImageChange={(_file: any, result: string) => {
-                      worker.current?.postMessage({ type: 'reset' }); // Reset image cache
-                      setImage(result);
-                      setPetDescription(''); // Clear old description immediately
-                      setCurrentPrompt('');
-                      setUserFeedback('');
-                    }}
-                  />
+                  <div className="relative">
+                    <ImageInput
+                      imagePreview={imagePreview}
+                      setImagePreview={setImagePreview}
+                      className="w-full h-64 rounded-xl border-2 border-dashed border-purple-300 dark:border-purple-600 hover:border-purple-500 transition-all cursor-pointer overflow-hidden"
+                      onImageChange={(_file: any, result: string) => {
+                        worker.current?.postMessage({ type: 'reset' }); // Reset image cache
+                        setImage(result);
+                        setPetDescription(''); // Clear old description immediately
+                        setCurrentPrompt(''); // Clear prompt to stop name generation
+                        setUserFeedback(''); // Clear feedback
+                        setPromptKey(0); // Reset prompt key to prevent generation
+                      }}
+                    />
+                    {status === 'loading' && (
+                      <div className="absolute inset-0 bg-white/90 dark:bg-gray-900/90 rounded-xl flex flex-col items-center justify-center gap-3 backdrop-blur-sm">
+                        <div className="w-16 h-16 rounded-full bg-linear-to-r from-purple-200 to-pink-200 dark:from-purple-800 dark:to-pink-800 animate-pulse"></div>
+                        <div className="w-32 h-3 bg-purple-200 dark:bg-purple-800 rounded animate-pulse"></div>
+                        <div className="w-24 h-3 bg-pink-200 dark:bg-pink-800 rounded animate-pulse"></div>
+                      </div>
+                    )}
+                  </div>
                   {image && (
                     <button
                       onClick={() => {
                         worker.current?.postMessage({ type: 'reset' });
                         setImage(null);
+                        setImagePreview(null);
                         setPetDescription('');
                         setCurrentPrompt('');
                         setUserFeedback('');
+                        setPromptKey(0);
+                        setNames(null);
                       }}
                       className="text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 underline"
                     >
@@ -265,22 +298,22 @@ Be concise. No introduction or conclusion.`
                   onClick={handleGenerateNames}
                   disabled={!image || credits <= 0 || isAnalyzing || !petDescription}
                   className={`w-full py-4 rounded-xl font-semibold text-white text-lg shadow-lg transition-all duration-300 ${!image || credits <= 0 || isAnalyzing || !petDescription
-                      ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-linear-to-r from-purple-600 to-pink-600 hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98]'
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-linear-to-r from-purple-600 to-pink-600 hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98]'
                     }`}
                 >
-                  {!image ? '📸 Upload a Photo First' : 
-                   status === 'loading' ? '⏳ Loading AI Model...' :
-                   isAnalyzing ? '🔍 Analyzing Photo...' : 
-                   !petDescription ? '⏳ Analyzing...' :
-                   credits <= 0 ? '⚡ Out of Credits' :
-                   isGenerating ? '🎨 Generating Names...' :
-                   names && currentPrompt ? '🔄 Generate Again' : '✨ Generate Names'}
+                  {!image ? '📸 Upload a Photo First' :
+                    status === 'loading' ? '⏳ Loading AI Model...' :
+                      isAnalyzing ? '🔍 Analyzing Photo...' :
+                        !petDescription ? '⏳ Analyzing...' :
+                          credits <= 0 ? '⚡ Out of Credits' :
+                            isGenerating ? '🎨 Generating Names...' :
+                              names && currentPrompt ? '🔄 Generate Again' : '✨ Generate Names'}
                 </button>
 
                 {credits <= 0 && (
                   <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-700 dark:text-red-300 text-center">
-                    Out of credits! Click "+100 Free" above to continue.
+                    Out of credits!
                   </div>
                 )}
               </div>
@@ -325,9 +358,9 @@ Be concise. No introduction or conclusion.`
                       <p className="text-gray-600 dark:text-gray-400 font-medium">Generating creative names...</p>
                       <p className="text-xs text-gray-500">AI is crafting perfect suggestions for your pet</p>
                       <div className="mt-4 flex gap-2">
-                        <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
-                        <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-                        <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                        <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                       </div>
                     </div>
                   ) : !currentPrompt ? (
@@ -337,34 +370,34 @@ Be concise. No introduction or conclusion.`
                       <p className="text-xs text-gray-500 dark:text-gray-500">Click the button to get AI-powered suggestions</p>
                     </div>
                   ) : (
-                    <div className="space-y-4" dir={isRTL ? 'rtl' : 'ltr'}>
-                      <div className="prose prose-sm dark:prose-invert max-w-none animate-fade-in text-white">
-                        <ReactMarkdown>{names}</ReactMarkdown>
-                      </div>
-                      
-                      {/* User Feedback Input */}
-                      <div className="space-y-2 pt-4 border-t border-purple-200 dark:border-purple-700">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                          <span>💭</span> Guide the AI (optional)
-                        </label>
-                        <textarea
-                          value={userFeedback}
-                          onChange={(e) => setUserFeedback(e.target.value)}
-                          placeholder="e.g., 'shorter names', 'more playful', 'related to mythology'..."
-                          className="w-full px-3 py-2 rounded-lg border-2 border-purple-200 dark:border-purple-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all outline-none resize-none"
-                          rows={2}
-                        />
-                        <button
-                          onClick={handleGenerateNames}
-                          disabled={isGenerating || credits <= 0}
-                          className="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white text-sm font-medium rounded-lg transition-all disabled:cursor-not-allowed"
-                        >
-                          {isGenerating ? '🎨 Refining...' : '🔄 Refine Names'}
-                        </button>
-                      </div>
+                    <div className="prose prose-sm dark:prose-invert max-w-none animate-fade-in text-white" dir={isRTL ? 'rtl' : 'ltr'}>
+                      <ReactMarkdown>{names}</ReactMarkdown>
                     </div>
                   )}
                 </div>
+
+                {/* User Feedback Input - Outside scrollable area */}
+                {names && currentPrompt && (
+                  <div className="space-y-2 pt-4" dir={isRTL ? 'rtl' : 'ltr'}>
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                      <span>💭</span> Guide the AI (optional)
+                    </label>
+                    <textarea
+                      value={userFeedback}
+                      onChange={(e) => setUserFeedback(e.target.value)}
+                      placeholder="e.g., 'shorter names', 'more playful', 'related to mythology'..."
+                      className="w-full px-3 py-2 rounded-lg border-2 border-purple-200 dark:border-purple-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all outline-none resize-none"
+                      rows={2}
+                    />
+                    <button
+                      onClick={handleGenerateNames}
+                      disabled={isGenerating || credits <= 0}
+                      className="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white text-sm font-medium rounded-lg transition-all disabled:cursor-not-allowed"
+                    >
+                      {isGenerating ? '🎨 Refining...' : '🔄 Refine Names'}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -3,12 +3,18 @@ import { useState, useRef } from 'react';
 const EXAMPLE_URL = 'https://images.unsplash.com/photo-1518791841217-8f162f1e1131?q=80&w=1200&auto=format&fit=crop&ixlib=rb-4.0.3&s=example';
 
 interface ImageInputProps extends React.HTMLAttributes<HTMLDivElement> {
-  onImageChange?: (file: File | null, result: string) => void;
+    imagePreview?: string | null;
+    setImagePreview?: (preview: string | null) => void;
+    onImageChange?: (file: File | null, result: string) => void;
 }
 
-const ImageInput = ({ onImageChange, ...props }: ImageInputProps) => {
-    const [imagePreview, setImagePreview] = useState<string | null>(null);
+const ImageInput = ({ imagePreview: externalImagePreview, setImagePreview: externalSetImagePreview, onImageChange, ...props }: ImageInputProps) => {
+    const [internalImagePreview, setInternalImagePreview] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    
+    // Use external state if provided, otherwise use internal state
+    const imagePreview = externalImagePreview !== undefined ? externalImagePreview : internalImagePreview;
+    const setImagePreview = externalSetImagePreview !== undefined ? externalSetImagePreview : setInternalImagePreview;
 
     const readFile = (file: File | null) => {
         if (!file) return;

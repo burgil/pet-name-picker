@@ -1,4 +1,30 @@
-console.log("Model worker loaded")
+const originalError = console.error;
+console.error = (...args: unknown[]) => {
+    if (
+        args.some(
+            (arg) =>
+                typeof arg === "string" &&
+                (arg.includes("Some nodes were not assigned") ||
+                    arg.includes("Rerunning with verbose"))
+        )
+    )
+        return;
+    originalError(...args);
+};
+
+const originalWarn = console.warn;
+console.warn = (...args: unknown[]) => {
+    if (
+        args.some(
+            (arg) =>
+                typeof arg === "string" &&
+                (arg.includes('Unknown model class "custom"') ||
+                    arg.includes("No language specified"))
+        )
+    )
+        return;
+    originalWarn(...args);
+};
 import {
     Florence2ForConditionalGeneration,
     AutoProcessor,
@@ -65,7 +91,6 @@ async function load() {
         // track model loading.
         try { self.postMessage(x); } catch (e) { /* ignore postMessage failures */ }
     });
-    console.log("processor", processor)
 
     self.postMessage({
         status: 'loading',
