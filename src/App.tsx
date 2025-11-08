@@ -16,7 +16,7 @@ function App() {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [userFeedback, setUserFeedback] = useState<string>('');
   const [names, setNames] = useState<string | null>(null);
-  const [aiModel, setAiModel] = useState<'gemini' | 'openai'>('gemini');
+  const [aiModel, setAiModel] = useState<'gemini' | 'openai'>('openai');
 
   const worker = useRef<Worker | null>(null);
 
