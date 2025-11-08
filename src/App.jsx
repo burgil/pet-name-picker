@@ -25,7 +25,7 @@ function App() {
   useEffect(() => {
     if (!worker.current) {
       // Create the worker if it does not yet exist.
-      worker.current = new Worker(new URL('./worker.js', import.meta.url), {
+      worker.current = new Worker(new URL('./worker.ts', import.meta.url), {
         type: 'module'
       });
     }

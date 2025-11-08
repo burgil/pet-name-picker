@@ -1,11 +1,11 @@
-console.log("hi")
+console.log("Loaded worker")
 import {
     Florence2ForConditionalGeneration,
     AutoProcessor,
     AutoTokenizer,
     RawImage,
     full,
-} from '@xenova/transformers';
+} from '@huggingface/transformers';
 
 async function hasFp16() {
     try {
@@ -125,17 +125,26 @@ async function run({ text, url, task }) {
 self.addEventListener('message', async (e) => {
     const { type, data } = e.data;
 
-    switch (type) {
-        case 'load':
-            load();
-            break;
+    try {
+        switch (type) {
+            case 'load':
+                await load();
+                break;
 
-        case 'run':
-            run(data);
-            break;
+            case 'run':
+                await run(data);
+                break;
 
-        case 'reset':
-            vision_inputs = image_size = null;
-            break;
+            case 'reset':
+                vision_inputs = image_size = null;
+                break;
+        }
+    } catch (err) {
+        try {
+            self.postMessage({ status: 'error', message: err?.message || String(err) });
+        } catch (postErr) {
+            // ignore
+        }
+        console.error('Worker message handler error', err);
     }
 });
