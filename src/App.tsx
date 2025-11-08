@@ -245,35 +245,6 @@ Be concise. No introduction or conclusion.`;
                   </div>
                 </div>
 
-                {/* AI Model Selection */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                    <span>🤖</span> AI Model
-                  </label>
-                  <div className="flex items-center gap-3 p-3 bg-white dark:bg-gray-900 rounded-xl border-2 border-purple-200 dark:border-purple-700">
-                    <button
-                      onClick={() => setAiModel('gemini')}
-                      className={`flex-1 py-2 px-3 rounded-lg font-medium transition-all ${
-                        aiModel === 'gemini'
-                          ? 'bg-purple-600 text-white shadow-lg'
-                          : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                      }`}
-                    >
-                      AI 1
-                    </button>
-                    <button
-                      onClick={() => setAiModel('openai')}
-                      className={`flex-1 py-2 px-3 rounded-lg font-medium transition-all ${
-                        aiModel === 'openai'
-                          ? 'bg-purple-600 text-white shadow-lg'
-                          : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                      }`}
-                    >
-                      AI 2
-                    </button>
-                  </div>
-                </div>
-
                 {/* Language Input */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
