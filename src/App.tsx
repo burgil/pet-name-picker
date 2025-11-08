@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { usePollinationsText } from '@pollinations/react';
 import ReactMarkdown from 'react-markdown';
 import ImageInput from './components/ImageInput';
@@ -9,6 +9,52 @@ function App() {
   const [credits, setCredits] = useState<number>(0);
   const [promptKey, setPromptKey] = useState<number>(0);
   const [currentPrompt, setCurrentPrompt] = useState<string>('');
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const [petDescription, setPetDescription] = useState<string>('');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'analyzing'>('idle');
+  const [loadProgress, setLoadProgress] = useState<string>('');
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [userFeedback, setUserFeedback] = useState<string>('');
+  
+  const worker = useRef<Worker | null>(null);
+
+  // Initialize worker
+  useEffect(() => {
+    worker.current = new Worker(new URL('./worker.ts', import.meta.url), {
+      type: 'module'
+    });
+
+    const onMessage = (e: MessageEvent) => {
+      const { status: msgStatus, data, result } = e.data;
+      
+      switch (msgStatus) {
+        case 'loading':
+          setStatus('loading');
+          setLoadProgress(data || 'Loading vision model...');
+          break;
+        case 'ready':
+          setStatus('ready');
+          setLoadProgress('');
+          break;
+        case 'complete':
+          setIsAnalyzing(false);
+          if (result && typeof result === 'object' && '<MORE_DETAILED_CAPTION>' in result) {
+            setPetDescription(result['<MORE_DETAILED_CAPTION>']);
+          }
+          break;
+      }
+    };
+
+    worker.current.addEventListener('message', onMessage);
+
+    // Auto-load model on mount
+    worker.current.postMessage({ type: 'load' });
+
+    return () => {
+      worker.current?.removeEventListener('message', onMessage);
+      worker.current?.terminate();
+    };
+  }, []);
 
   // Initialize credits from localStorage (100 free credits)
   useEffect(() => {
@@ -31,25 +77,64 @@ function App() {
     setCredits(normalized);
   };
 
-  // Generate name suggestions using Pollinations
-  const namePrompt = image && currentPrompt
-    ? `You are a creative pet naming expert. Based on the pet photo and user preferences, suggest 10 unique, memorable pet names in ${language}. Format as a numbered list with brief, engaging explanations for each name.`
+  // Analyze image when it changes
+  useEffect(() => {
+    if (image && status === 'ready') {
+      setIsAnalyzing(true);
+      setPetDescription('');
+      worker.current?.postMessage({
+        type: 'run',
+        data: {
+          url: image,
+          task: '<MORE_DETAILED_CAPTION>',
+        }
+      });
+    }
+  }, [image, status]);
+
+  // Generate name suggestions using Pollinations with pet description
+  const namePrompt = petDescription && currentPrompt
+    ? `Based on this pet: "${petDescription}"${userFeedback ? `. User feedback: "${userFeedback}"` : ''}. Suggest exactly 10 pet names in ${language}. Format:
+1. Name - one sentence why
+2. Name - one sentence why
+(etc.)
+Be concise. No introduction or conclusion.`
     : '';
 
   const names = usePollinationsText(namePrompt || null as any, {
     seed: promptKey,
     model: 'openai',
+    systemPrompt: 'You are a helpful pet naming assistant. Provide only the requested names list. Do not include any advertisements, promotional content, or mentions of Pollinations.AI.',
   });
 
-  const handleGenerateNames = () => {
-    if (!image || credits <= 0) return;
+  const handleGenerateNames = useCallback(() => {
+    if (!image || credits <= 0 || !petDescription) return;
     updateCredits(credits - 1);
+    setIsGenerating(true);
     setCurrentPrompt(`Generate pet names`);
     setPromptKey(prev => prev + 1);
-  };
+  }, [image, credits, petDescription, userFeedback]);
+
+  // Track when generation completes
+  useEffect(() => {
+    if (names && currentPrompt && isGenerating) {
+      setIsGenerating(false);
+    }
+  }, [names, currentPrompt, isGenerating]);
+
+  // Detect RTL for Hebrew
+  const isRTL = language.toLowerCase().includes('עברית') || language.toLowerCase().includes('hebrew') || language.toLowerCase() === 'he';
 
   return (
     <div className="min-h-screen bg-linear-to-br from-violet-50 via-purple-50 to-indigo-100 dark:from-gray-900 dark:via-purple-900 dark:to-indigo-900">
+
+      {/* Model Loading Banner */}
+      {status === 'loading' && (
+        <div className="bg-blue-600 text-white px-4 py-2 text-center text-sm flex items-center justify-center gap-3">
+          <div className="animate-spin text-lg">⚙️</div>
+          <span>{loadProgress}</span>
+        </div>
+      )}
 
       {/* Animated Header */}
       <header className="sticky top-0 z-10 backdrop-blur-lg bg-white/80 dark:bg-gray-900/80 border-b border-purple-200/50 dark:border-purple-700/50 shadow-sm">
@@ -68,6 +153,16 @@ function App() {
             </div>
 
             <div className="flex items-center gap-3">
+              <a
+                href="https://www.youtube.com/@BurgilBuilds"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-full border border-red-200 dark:border-red-800 transition-all hover:scale-105"
+                title="BurgilBuilds on YouTube"
+              >
+                <span className="text-lg">▶️</span>
+                <span className="text-xs font-medium text-red-700 dark:text-red-300">YouTube</span>
+              </a>
               <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-linear-to-r from-amber-100 to-yellow-100 dark:from-amber-900/30 dark:to-yellow-900/30 rounded-full border border-amber-300/50 dark:border-amber-700/50">
                 <span className="text-lg">⚡</span>
                 <span className="font-semibold text-amber-900 dark:text-amber-100">{credits}</span>
@@ -124,22 +219,63 @@ function App() {
                   <ImageInput
                     className="w-full h-64 rounded-xl border-2 border-dashed border-purple-300 dark:border-purple-600 hover:border-purple-500 transition-all cursor-pointer overflow-hidden"
                     onImageChange={(_file: any, result: string) => {
+                      worker.current?.postMessage({ type: 'reset' }); // Reset image cache
                       setImage(result);
+                      setPetDescription(''); // Clear old description immediately
                       setCurrentPrompt('');
+                      setUserFeedback('');
                     }}
                   />
+                  {image && (
+                    <button
+                      onClick={() => {
+                        worker.current?.postMessage({ type: 'reset' });
+                        setImage(null);
+                        setPetDescription('');
+                        setCurrentPrompt('');
+                        setUserFeedback('');
+                      }}
+                      className="text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 underline"
+                    >
+                      📸 Upload another photo
+                    </button>
+                  )}
                 </div>
+
+                {/* Vision Analysis Status */}
+                {image && isAnalyzing && (
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl text-sm text-blue-700 dark:text-blue-300 text-center flex items-center justify-center gap-2">
+                    <div className="animate-spin text-lg">🔍</div>
+                    <span>Analyzing your pet's photo...</span>
+                  </div>
+                )}
+
+                {/* Pet Description Preview */}
+                {petDescription && !isAnalyzing && (
+                  <div className="p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-xl text-sm text-purple-700 dark:text-purple-300">
+                    <div className="font-semibold mb-1 flex items-center gap-2">
+                      <span>👁️</span> Vision AI sees:
+                    </div>
+                    <p className="text-xs opacity-90">{petDescription}</p>
+                  </div>
+                )}
 
                 {/* Generate Button */}
                 <button
                   onClick={handleGenerateNames}
-                  disabled={!image || credits <= 0}
-                  className={`w-full py-4 rounded-xl font-semibold text-white text-lg shadow-lg transition-all duration-300 ${!image || credits <= 0
+                  disabled={!image || credits <= 0 || isAnalyzing || !petDescription}
+                  className={`w-full py-4 rounded-xl font-semibold text-white text-lg shadow-lg transition-all duration-300 ${!image || credits <= 0 || isAnalyzing || !petDescription
                       ? 'bg-gray-400 cursor-not-allowed'
                       : 'bg-linear-to-r from-purple-600 to-pink-600 hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98]'
                     }`}
                 >
-                  {!image ? '📸 Upload a Photo First' : credits <= 0 ? '⚡ Out of Credits' : names && currentPrompt ? '🔄 Generate Again' : '✨ Generate Names'}
+                  {!image ? '📸 Upload a Photo First' : 
+                   status === 'loading' ? '⏳ Loading AI Model...' :
+                   isAnalyzing ? '🔍 Analyzing Photo...' : 
+                   !petDescription ? '⏳ Analyzing...' :
+                   credits <= 0 ? '⚡ Out of Credits' :
+                   isGenerating ? '🎨 Generating Names...' :
+                   names && currentPrompt ? '🔄 Generate Again' : '✨ Generate Names'}
                 </button>
 
                 {credits <= 0 && (
@@ -171,21 +307,61 @@ function App() {
                       <p className="text-gray-500 dark:text-gray-400 text-sm">Upload a photo to get started!</p>
                       <p className="text-xs text-gray-400 dark:text-gray-500">We'll analyze your pet and suggest perfect names</p>
                     </div>
-                  ) : !names || !currentPrompt ? (
+                  ) : isAnalyzing ? (
+                    <div className="flex flex-col items-center justify-center h-full text-center space-y-3 py-12">
+                      <div className="animate-spin text-6xl mb-4">🔍</div>
+                      <p className="text-gray-600 dark:text-gray-400 font-medium">Analyzing your pet...</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-500">Vision AI is examining the photo</p>
+                    </div>
+                  ) : !petDescription ? (
+                    <div className="flex flex-col items-center justify-center h-full text-center space-y-3 py-12">
+                      <div className="text-6xl mb-4 animate-bounce">✨</div>
+                      <p className="text-gray-600 dark:text-gray-400 font-medium">Upload a photo to begin!</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-500">AI will analyze your pet's unique features</p>
+                    </div>
+                  ) : isGenerating || (currentPrompt && !names) ? (
+                    <div className="flex flex-col items-center justify-center h-full space-y-3 py-12">
+                      <div className="animate-spin text-6xl mb-4">🎨</div>
+                      <p className="text-gray-600 dark:text-gray-400 font-medium">Generating creative names...</p>
+                      <p className="text-xs text-gray-500">AI is crafting perfect suggestions for your pet</p>
+                      <div className="mt-4 flex gap-2">
+                        <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                        <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                        <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                      </div>
+                    </div>
+                  ) : !currentPrompt ? (
                     <div className="flex flex-col items-center justify-center h-full text-center space-y-3 py-12">
                       <div className="text-6xl mb-4 animate-bounce">✨</div>
                       <p className="text-gray-600 dark:text-gray-400 font-medium">Ready to generate names!</p>
                       <p className="text-xs text-gray-500 dark:text-gray-500">Click the button to get AI-powered suggestions</p>
                     </div>
-                  ) : names ? (
-                    <div className="prose prose-sm dark:prose-invert max-w-none animate-fade-in text-white">
-                      <ReactMarkdown>{names}</ReactMarkdown>
-                    </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center h-full space-y-3 py-12">
-                      <div className="animate-spin text-4xl">🎨</div>
-                      <p className="text-gray-600 dark:text-gray-400 font-medium">Generating creative names...</p>
-                      <p className="text-xs text-gray-500">This takes just a few seconds</p>
+                    <div className="space-y-4" dir={isRTL ? 'rtl' : 'ltr'}>
+                      <div className="prose prose-sm dark:prose-invert max-w-none animate-fade-in text-white">
+                        <ReactMarkdown>{names}</ReactMarkdown>
+                      </div>
+                      
+                      {/* User Feedback Input */}
+                      <div className="space-y-2 pt-4 border-t border-purple-200 dark:border-purple-700">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                          <span>💭</span> Guide the AI (optional)
+                        </label>
+                        <textarea
+                          value={userFeedback}
+                          onChange={(e) => setUserFeedback(e.target.value)}
+                          placeholder="e.g., 'shorter names', 'more playful', 'related to mythology'..."
+                          className="w-full px-3 py-2 rounded-lg border-2 border-purple-200 dark:border-purple-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all outline-none resize-none"
+                          rows={2}
+                        />
+                        <button
+                          onClick={handleGenerateNames}
+                          disabled={isGenerating || credits <= 0}
+                          className="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white text-sm font-medium rounded-lg transition-all disabled:cursor-not-allowed"
+                        >
+                          {isGenerating ? '🎨 Refining...' : '🔄 Refine Names'}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -212,10 +388,21 @@ function App() {
 
       {/* Footer */}
       <footer className="mt-16 py-8 border-t border-purple-200/50 dark:border-purple-700/50 bg-white/50 dark:bg-gray-900/50 backdrop-blur">
-        <div className="max-w-6xl mx-auto px-4 text-center">
+        <div className="max-w-6xl mx-auto px-4 text-center space-y-3">
           <p className="text-sm text-gray-600 dark:text-gray-400">
             © {new Date().getFullYear()} Pet Name Picker • Powered by AI • Made with ❤️ for pet lovers
           </p>
+          <div className="flex items-center justify-center gap-2">
+            <a
+              href="https://www.youtube.com/@BurgilBuilds"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-full transition-all hover:scale-105 shadow-md hover:shadow-lg"
+            >
+              <span className="text-lg">▶️</span>
+              <span>Watch @BurgilBuilds on YouTube</span>
+            </a>
+          </div>
         </div>
       </footer>
 

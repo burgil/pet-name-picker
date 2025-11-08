@@ -88,12 +88,11 @@ async function load() {
 
 const TASKS_WITH_INPUTS = [
     '<CAPTION_TO_PHRASE_GROUNDING>',
-    '<MORE_DETAILED_CAPTION>',
 ]
 
 let vision_inputs: any = null;
 let image_size: any = null;
-async function run({ text, url, task, language = 'English', conversation = [] }: { text?: string; url: string; task?: string; language?: string; conversation?: string[] }) {
+async function run({ text, url, task }: { text?: string; url: string; task?: string }) {
     const [model, tokenizer, processor] = await ModelSingleton.getInstance();
 
     // Read and preprocess image
@@ -105,16 +104,9 @@ async function run({ text, url, task, language = 'English', conversation = [] }:
         vision_inputs = await processor(image);
     }
 
-    // Build an instruction prompt that includes the task, language and conversation
     let user_input = task || '<MORE_DETAILED_CAPTION>';
-    const convText = Array.isArray(conversation) && conversation.length ? conversation.join('\n') : (text || '');
-    if (TASKS_WITH_INPUTS.includes(user_input) && convText) {
-        user_input += '\n' + convText;
-    }
-
-    // Add language hint so model focuses on requested language for names
-    if (language) {
-        user_input += `\nLanguage: ${language}`;
+    if (TASKS_WITH_INPUTS.includes(task || '') && text) {
+        user_input += text;
     }
 
     const prompts = processor.construct_prompts(user_input);
