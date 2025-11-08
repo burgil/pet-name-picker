@@ -2,37 +2,44 @@ import { useState, useRef } from 'react';
 
 const EXAMPLE_URL = 'https://images.unsplash.com/photo-1518791841217-8f162f1e1131?q=80&w=1200&auto=format&fit=crop&ixlib=rb-4.0.3&s=example';
 
-const ImageInput = ({ onImageChange, ...props }) => {
-    const [imagePreview, setImagePreview] = useState(null);
-    const fileInputRef = useRef(null);
+interface ImageInputProps extends React.HTMLAttributes<HTMLDivElement> {
+  onImageChange?: (file: File | null, result: string) => void;
+}
 
-    const readFile = (file) => {
+const ImageInput = ({ onImageChange, ...props }: ImageInputProps) => {
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const readFile = (file: File | null) => {
         if (!file) return;
         const reader = new FileReader();
         reader.onloadend = () => {
-            setImagePreview(reader.result);
+            const result = reader.result as string;
+            setImagePreview(result);
             if (onImageChange) {
-                onImageChange(file, reader.result);
+                onImageChange(file, result);
             }
         };
         reader.readAsDataURL(file);
     }
 
-    const handleImageChange = (event) => {
-        readFile(event.target.files[0]);
+    const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) readFile(file);
     };
 
-    const handleDragOver = (event) => {
+    const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
         event.preventDefault();
     };
 
-    const handleDrop = (event) => {
+    const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
         event.preventDefault();
-        readFile(event.dataTransfer.files[0]);
+        const file = event.dataTransfer.files[0];
+        if (file) readFile(file);
     };
 
     const handleClick = () => {
-        fileInputRef.current.click();
+        fileInputRef.current?.click();
     };
 
     return (
@@ -57,7 +64,7 @@ const ImageInput = ({ onImageChange, ...props }) => {
                     <span className="text-gray-500 text-sm hover:text-gray-800 mt-2" onClick={(e) => {
                         e.stopPropagation();
                         setImagePreview(EXAMPLE_URL);
-                        onImageChange(null, EXAMPLE_URL);
+                        if (onImageChange) onImageChange(null, EXAMPLE_URL);
                     }}>(or <u>try an example</u>)</span>
                 </div>
             )}

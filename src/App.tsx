@@ -27,7 +27,7 @@ function App() {
 
   const updateCredits = (next: number) => {
     const normalized = Math.max(0, Math.floor(next));
-    try { localStorage.setItem('pnpc_credits', String(normalized)); } catch (e) {}
+    try { localStorage.setItem('pnpc_credits', String(normalized)); } catch (e) { }
     setCredits(normalized);
   };
 
@@ -36,7 +36,7 @@ function App() {
     ? `You are a creative pet naming expert. Based on the pet photo and user preferences, suggest 10 unique, memorable pet names in ${language}. Format as a numbered list with brief, engaging explanations for each name.`
     : '';
 
-  const names = usePollinationsText(namePrompt || null, {
+  const names = usePollinationsText(namePrompt || null as any, {
     seed: promptKey,
     model: 'openai',
   });
@@ -49,34 +49,33 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-violet-50 via-purple-50 to-indigo-100 dark:from-gray-900 dark:via-purple-900 dark:to-indigo-900">
-      
+    <div className="min-h-screen bg-linear-to-br from-violet-50 via-purple-50 to-indigo-100 dark:from-gray-900 dark:via-purple-900 dark:to-indigo-900">
+
       {/* Animated Header */}
       <header className="sticky top-0 z-10 backdrop-blur-lg bg-white/80 dark:bg-gray-900/80 border-b border-purple-200/50 dark:border-purple-700/50 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 animate-fade-in">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg">
+              <div className="w-10 h-10 bg-linear-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg">
                 <span className="text-2xl">🐾</span>
               </div>
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                <h1 className="text-2xl font-bold bg-linear-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
                   Pet Name Picker
                 </h1>
                 <p className="text-xs text-gray-600 dark:text-gray-400">AI-powered • Multilingual • Instant</p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3">
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-amber-100 to-yellow-100 dark:from-amber-900/30 dark:to-yellow-900/30 rounded-full border border-amber-300/50 dark:border-amber-700/50">
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-linear-to-r from-amber-100 to-yellow-100 dark:from-amber-900/30 dark:to-yellow-900/30 rounded-full border border-amber-300/50 dark:border-amber-700/50">
                 <span className="text-lg">⚡</span>
                 <span className="font-semibold text-amber-900 dark:text-amber-100">{credits}</span>
                 <span className="text-xs text-amber-700 dark:text-amber-300">credits</span>
               </div>
-              <button 
+              <button
                 onClick={() => updateCredits(credits + 100)}
-                className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm rounded-full font-medium hover:shadow-lg hover:scale-105 transition-all duration-200"
-              >
+                className="px-3 py-1.5 bg-linear-to-r from-purple-600 to-pink-600 text-white text-sm rounded-full font-medium hover:shadow-lg hover:scale-105 transition-all duration-200">
                 + 100 Free
               </button>
             </div>
@@ -87,7 +86,7 @@ function App() {
       {/* Hero Section */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         <div className="text-center mb-8 animate-fade-in">
-          <h2 className="text-3xl sm:text-5xl font-bold mb-4 bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 bg-clip-text text-transparent leading-tight">
+          <h2 className="text-3xl sm:text-5xl font-bold mb-4 bg-linear-to-r from-purple-600 via-pink-600 to-indigo-600 bg-clip-text text-transparent leading-tight">
             Find The Perfect Name<br />For Your Best Friend
           </h2>
           <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
@@ -98,22 +97,22 @@ function App() {
         {/* Main Card */}
         <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-purple-100 dark:border-purple-800/50 overflow-hidden">
           <div className="grid md:grid-cols-2 gap-0">
-            
+
             {/* Left Column - Input */}
             <div className="p-6 sm:p-8 border-r border-gray-200 dark:border-gray-700">
               <div className="space-y-6">
-                
+
                 {/* Language Input */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
                     <span>🌍</span> Preferred Language
                   </label>
-                  <input 
+                  <input
                     type="text"
-                    value={language} 
+                    value={language}
                     onChange={(e) => setLanguage(e.target.value)}
-                    placeholder="e.g. English, Español, 日本語, Français"
-                    className="w-full px-4 py-3 rounded-xl border-2 border-purple-200 dark:border-purple-700 bg-white dark:bg-gray-900 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/20 transition-all outline-none"
+                    placeholder="e.g. English, עברית, Español, 日本語, Français"
+                    className="w-full px-4 py-3 text-white rounded-xl border-2 border-purple-200 dark:border-purple-700 bg-white dark:bg-gray-900 focus:border-purple-500 focus:ring-4 focus:ring-purple-500/20 transition-all outline-none"
                   />
                 </div>
 
@@ -122,7 +121,7 @@ function App() {
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
                     <span>📸</span> Upload Your Pet's Photo
                   </label>
-                  <ImageInput 
+                  <ImageInput
                     className="w-full h-64 rounded-xl border-2 border-dashed border-purple-300 dark:border-purple-600 hover:border-purple-500 transition-all cursor-pointer overflow-hidden"
                     onImageChange={(_file: any, result: string) => {
                       setImage(result);
@@ -135,11 +134,10 @@ function App() {
                 <button
                   onClick={handleGenerateNames}
                   disabled={!image || credits <= 0}
-                  className={`w-full py-4 rounded-xl font-semibold text-white text-lg shadow-lg transition-all duration-300 ${
-                    !image || credits <= 0
+                  className={`w-full py-4 rounded-xl font-semibold text-white text-lg shadow-lg transition-all duration-300 ${!image || credits <= 0
                       ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98]'
-                  }`}
+                      : 'bg-linear-to-r from-purple-600 to-pink-600 hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98]'
+                    }`}
                 >
                   {!image ? '📸 Upload a Photo First' : credits <= 0 ? '⚡ Out of Credits' : names && currentPrompt ? '🔄 Generate Again' : '✨ Generate Names'}
                 </button>
@@ -153,7 +151,7 @@ function App() {
             </div>
 
             {/* Right Column - Results */}
-            <div className="p-6 sm:p-8 bg-gradient-to-br from-purple-50/50 to-pink-50/50 dark:from-purple-900/20 dark:to-pink-900/20">
+            <div className="p-6 sm:p-8 bg-linear-to-br from-purple-50/50 to-pink-50/50 dark:from-purple-900/20 dark:to-pink-900/20">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
@@ -180,7 +178,7 @@ function App() {
                       <p className="text-xs text-gray-500 dark:text-gray-500">Click the button to get AI-powered suggestions</p>
                     </div>
                   ) : names ? (
-                    <div className="prose prose-sm dark:prose-invert max-w-none animate-fade-in">
+                    <div className="prose prose-sm dark:prose-invert max-w-none animate-fade-in text-white">
                       <ReactMarkdown>{names}</ReactMarkdown>
                     </div>
                   ) : (
