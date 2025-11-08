@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 
-const EXAMPLE_URL = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/beetle.png';
+const EXAMPLE_URL = 'https://images.unsplash.com/photo-1518791841217-8f162f1e1131?q=80&w=1200&auto=format&fit=crop&ixlib=rb-4.0.3&s=example';
 
 const ImageInput = ({ onImageChange, ...props }) => {
     const [imagePreview, setImagePreview] = useState(null);
@@ -52,9 +52,9 @@ const ImageInput = ({ onImageChange, ...props }) => {
             {imagePreview ? (
                 <img src={imagePreview} alt="Selected" className="w-full max-h-[250px] h-full object-contain rounded-md" />
             ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-md">
-                    <span className="text-gray-600 text-center m-3"><u>Drag & drop</u> or <u>click</u><br />to select an image</span>
-                    <span className="text-gray-500 text-sm hover:text-gray-800" onClick={(e) => {
+                <div className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-md p-4">
+                    <span className="text-gray-600 text-center m-3"><u>Drag & drop</u> or <u>click</u><br />to upload a pet photo</span>
+                    <span className="text-gray-500 text-sm hover:text-gray-800 mt-2" onClick={(e) => {
                         e.stopPropagation();
                         setImagePreview(EXAMPLE_URL);
                         onImageChange(null, EXAMPLE_URL);

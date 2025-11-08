@@ -1,4 +1,4 @@
-console.log("Loaded worker")
+console.log("Model worker loaded")
 import {
     Florence2ForConditionalGeneration,
     AutoProcessor,
@@ -19,7 +19,7 @@ async function hasFp16() {
 /**
  * This class uses the Singleton pattern to ensure that only one instance of the model is loaded.
  */
-class Florence2Singleton {
+class ModelSingleton {
     static model_id = 'onnx-community/Florence-2-base-ft';
 
     static async getInstance(progress_callback = null) {
@@ -50,7 +50,7 @@ async function load() {
     });
 
     // Load the pipeline and save it for future use.
-    const [model, tokenizer, processor] = await Florence2Singleton.getInstance(x => {
+    const [model, tokenizer, processor] = await ModelSingleton.getInstance(x => {
         // We also add a progress callback to the pipeline so that we can
         // track model loading.
         self.postMessage(x);
@@ -78,12 +78,13 @@ async function load() {
 
 const TASKS_WITH_INPUTS = [
     '<CAPTION_TO_PHRASE_GROUNDING>',
+    '<MORE_DETAILED_CAPTION>',
 ]
 
 let vision_inputs;
 let image_size;
-async function run({ text, url, task }) {
-    const [model, tokenizer, processor] = await Florence2Singleton.getInstance();
+async function run({ text, url, task, language = 'English', conversation = [] }) {
+    const [model, tokenizer, processor] = await ModelSingleton.getInstance();
 
     // Read and preprocess image
     const start = performance.now();
@@ -94,10 +95,18 @@ async function run({ text, url, task }) {
         vision_inputs = await processor(image);
     }
 
+    // Build an instruction prompt that includes the task, language and conversation
     let user_input = task;
-    if (TASKS_WITH_INPUTS.includes(task) && text) {
-        user_input += text;
+    const convText = Array.isArray(conversation) && conversation.length ? conversation.join('\n') : (text || '');
+    if (TASKS_WITH_INPUTS.includes(task) && convText) {
+        user_input += '\n' + convText;
     }
+
+    // Add language hint so model focuses on requested language for names
+    if (language) {
+        user_input += `\nLanguage: ${language}`;
+    }
+
     const prompts = processor.construct_prompts(user_input);
     const text_inputs = tokenizer(prompts);
 
