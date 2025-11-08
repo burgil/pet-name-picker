@@ -16,6 +16,7 @@ function App() {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [userFeedback, setUserFeedback] = useState<string>('');
   const [names, setNames] = useState<string | null>(null);
+  const [aiModel, setAiModel] = useState<'gemini' | 'openai'>('gemini');
 
   const worker = useRef<Worker | null>(null);
 
@@ -119,7 +120,7 @@ Be concise. No introduction or conclusion.`;
               }
             ],
             seed: promptKey,
-            model: 'openai',
+            model: aiModel,
             jsonMode: false
           })
         });
@@ -134,7 +135,7 @@ Be concise. No introduction or conclusion.`;
     };
 
     generateNames();
-  }, [promptKey, petDescription, currentPrompt, userFeedback, language]);
+  }, [promptKey, petDescription, currentPrompt]);
 
   const handleGenerateNames = useCallback(() => {
     if (!image || credits <= 0 || !petDescription) return;
@@ -214,6 +215,35 @@ Be concise. No introduction or conclusion.`;
             {/* Left Column - Input */}
             <div className="p-6 sm:p-8 border-r border-gray-200 dark:border-gray-700">
               <div className="space-y-6">
+
+                {/* AI Model Selection */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                    <span>🤖</span> AI Model
+                  </label>
+                  <div className="flex items-center gap-3 p-3 bg-white dark:bg-gray-900 rounded-xl border-2 border-purple-200 dark:border-purple-700">
+                    <button
+                      onClick={() => setAiModel('gemini')}
+                      className={`flex-1 py-2 px-3 rounded-lg font-medium transition-all ${
+                        aiModel === 'gemini'
+                          ? 'bg-purple-600 text-white shadow-lg'
+                          : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      AI 1
+                    </button>
+                    <button
+                      onClick={() => setAiModel('openai')}
+                      className={`flex-1 py-2 px-3 rounded-lg font-medium transition-all ${
+                        aiModel === 'openai'
+                          ? 'bg-purple-600 text-white shadow-lg'
+                          : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      AI 2
+                    </button>
+                  </div>
+                </div>
 
                 {/* Language Input */}
                 <div className="space-y-2">
