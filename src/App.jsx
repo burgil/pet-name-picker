@@ -23,6 +23,29 @@ function App() {
   const [language, setLanguage] = useState('English');
   const [prompt, setPrompt] = useState('');
   const [conversation, setConversation] = useState([]);
+  const [credits, setCredits] = useState(0);
+  const [noCreditsMessage, setNoCreditsMessage] = useState('');
+
+  // initialize credits from localStorage (give 100 free credits if none present)
+  useEffect(() => {
+    try {
+      const stored = parseInt(localStorage.getItem('pnpc_credits') || '', 10);
+      if (!Number.isFinite(stored) || stored <= 0) {
+        localStorage.setItem('pnpc_credits', String(100));
+        setCredits(100);
+      } else {
+        setCredits(stored);
+      }
+    } catch (e) {
+      setCredits(100);
+    }
+  }, []);
+
+  const updateCredits = (next) => {
+    const normalized = Math.max(0, Math.floor(next));
+    try { localStorage.setItem('pnpc_credits', String(normalized)); } catch (e) {}
+    setCredits(normalized);
+  }
 
   // We use the `useEffect` hook to setup the worker as soon as the `App` component is mounted.
   useEffect(() => {
@@ -99,6 +122,15 @@ function App() {
     const newPrompt = extraPrompt ?? prompt;
     if (!newPrompt) return;
 
+    if (credits <= 0) {
+      setNoCreditsMessage('You are out of credits. Tap "Get 100 credits" to simulate a top-up.');
+      return;
+    }
+
+    // Deduct 1 credit per generation
+    updateCredits(credits - 1);
+    setNoCreditsMessage('');
+
     // Append to conversation
     const nextConversation = [...conversation, newPrompt];
     setConversation(nextConversation);
@@ -114,7 +146,7 @@ function App() {
         conversation: nextConversation,
       }
     });
-  }, [conversation, prompt, image, task, language]);
+  }, [conversation, prompt, image, task, language, credits]);
 
   return (
     IS_WEBGPU_AVAILABLE
@@ -132,13 +164,17 @@ function App() {
             </div>
           )}
 
-          <header className="w-full p-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-white dark:from-gray-900 dark:to-gray-800">
+          <header className="w-full p-4 border-b border-gray-200 dark:border-gray-700 bg-linear-to-r from-blue-50 to-white dark:from-gray-900 dark:to-gray-800">
             <div className="max-w-3xl mx-auto flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold">Pet Name Picker</h1>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Upload a pet photo and get name ideas in any language.</p>
               </div>
-              <div className="text-sm text-gray-500">More Detailed Caption</div>
+              <div className="flex items-center gap-3">
+                <div className="text-sm text-gray-500">More Detailed Caption</div>
+                <div className="bg-yellow-50 text-yellow-800 px-2 py-1 rounded text-sm">Credits: {credits}</div>
+                <button className="text-xs px-2 py-1 bg-indigo-600 text-white rounded" onClick={() => updateCredits(credits + 100)}>Get 100 credits</button>
+              </div>
             </div>
           </header>
 
@@ -161,13 +197,19 @@ function App() {
                     {status === null ? (
                       <button className="px-4 py-2 rounded bg-blue-500 text-white" onClick={handleLoadModel}>Load model</button>
                     ) : null}
-                    <button className="px-4 py-2 rounded bg-green-500 text-white disabled:opacity-50" disabled={status === 'running' || image === null} onClick={() => handleAsk('Give me 10 pet name ideas')}>{status === 'running' ? 'Thinking…' : 'Suggest names'}</button>
+                    <button className="px-4 py-2 rounded bg-green-500 text-white disabled:opacity-50" disabled={status === 'running' || image === null || credits <= 0} onClick={() => handleAsk('Give me 10 pet name ideas')}>{status === 'running' ? 'Thinking…' : 'Suggest names'}</button>
                   </div>
                 </div>
 
                 <div className="md:w-1/2 flex flex-col gap-3">
                   <label className="text-sm">Conversation & prompts</label>
                   <div className="flex flex-col border rounded-md p-3 h-[300px] overflow-auto bg-gray-50 dark:bg-gray-800">
+                    {noCreditsMessage && (
+                      <div className="mb-2 p-2 bg-red-50 text-red-700 rounded text-sm flex items-center justify-between">
+                        <div>{noCreditsMessage}</div>
+                        <button className="ml-2 px-2 py-1 bg-indigo-600 text-white rounded text-xs" onClick={() => updateCredits(credits + 100)}>Get 100 credits</button>
+                      </div>
+                    )}
                     {conversation.length === 0 && <p className="text-sm text-gray-500">No prompts yet — ask for names to start the conversation.</p>}
                     {conversation.map((c, i) => (
                       <div key={i} className="mb-2">
@@ -189,7 +231,7 @@ function App() {
 
                   <textarea className="border rounded-md p-2 mt-2" rows={3} placeholder="Add more context or ask again (e.g. 'short names', 'funny names')" value={prompt} onChange={(e) => setPrompt(e.target.value)} />
                   <div className="flex gap-2">
-                    <button className="px-4 py-2 rounded bg-blue-600 text-white" disabled={status === 'running' || image === null || !prompt} onClick={() => handleAsk()}>{status === 'running' ? 'Thinking…' : 'Ask again'}</button>
+                    <button className="px-4 py-2 rounded bg-blue-600 text-white" disabled={status === 'running' || image === null || !prompt || credits <= 0} onClick={() => handleAsk()}>{status === 'running' ? 'Thinking…' : 'Ask again'}</button>
                     <button className="px-4 py-2 rounded bg-gray-200" onClick={() => { setConversation([]); setResult(null); setPrompt(''); }}>Reset</button>
                   </div>
                 </div>

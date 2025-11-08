@@ -7,10 +7,13 @@ import {
     full,
 } from '@huggingface/transformers';
 
-async function hasFp16() {
+async function hasFp16(): Promise<boolean> {
     try {
-        const adapter = await navigator.gpu.requestAdapter();
-        return adapter.features.has('shader-f16');
+        const nav: any = navigator;
+        const gpu = nav?.gpu;
+        if (!gpu || typeof gpu.requestAdapter !== 'function') return false;
+        const adapter = await gpu.requestAdapter();
+        return !!(adapter && adapter.features && typeof adapter.features.has === 'function' && adapter.features.has('shader-f16'));
     } catch (e) {
         return false;
     }
@@ -21,8 +24,12 @@ async function hasFp16() {
  */
 class ModelSingleton {
     static model_id = 'onnx-community/Florence-2-base-ft';
+    static processor: any;
+    static tokenizer: any;
+    static supports_fp16: boolean | undefined;
+    static model: any;
 
-    static async getInstance(progress_callback = null) {
+    static async getInstance(progress_callback?: (x: any) => void): Promise<any[]> {
         this.processor ??= AutoProcessor.from_pretrained(this.model_id);
         this.tokenizer ??= AutoTokenizer.from_pretrained(this.model_id);
 
@@ -35,7 +42,7 @@ class ModelSingleton {
                 decoder_model_merged: 'q4', // or 'fp16' or 'fp32'
             },
             device: 'webgpu',
-            progress_callback,
+            progress_callback: progress_callback ?? undefined,
         });
 
         return Promise.all([this.model, this.tokenizer, this.processor]);
@@ -50,10 +57,10 @@ async function load() {
     });
 
     // Load the pipeline and save it for future use.
-    const [model, tokenizer, processor] = await ModelSingleton.getInstance(x => {
+    const [model, tokenizer, processor] = await ModelSingleton.getInstance((x: any) => {
         // We also add a progress callback to the pipeline so that we can
         // track model loading.
-        self.postMessage(x);
+        try { self.postMessage(x); } catch (e) { /* ignore postMessage failures */ }
     });
     console.log("processor", processor)
 
@@ -81,9 +88,9 @@ const TASKS_WITH_INPUTS = [
     '<MORE_DETAILED_CAPTION>',
 ]
 
-let vision_inputs;
-let image_size;
-async function run({ text, url, task, language = 'English', conversation = [] }) {
+let vision_inputs: any = null;
+let image_size: any = null;
+async function run({ text, url, task, language = 'English', conversation = [] }: { text?: string; url: string; task?: string; language?: string; conversation?: string[] }) {
     const [model, tokenizer, processor] = await ModelSingleton.getInstance();
 
     // Read and preprocess image
@@ -150,7 +157,8 @@ self.addEventListener('message', async (e) => {
         }
     } catch (err) {
         try {
-            self.postMessage({ status: 'error', message: err?.message || String(err) });
+            const msg = (err as any)?.message ?? String(err);
+            self.postMessage({ status: 'error', message: msg });
         } catch (postErr) {
             // ignore
         }
