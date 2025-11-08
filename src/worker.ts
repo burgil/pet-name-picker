@@ -34,7 +34,7 @@ class ModelSingleton {
         this.tokenizer ??= AutoTokenizer.from_pretrained(this.model_id);
 
         this.supports_fp16 ??= await hasFp16();
-        this.model ??= Florence2ForConditionalGeneration.from_pretrained(this.model_id, {
+        const options: any = {
             dtype: {
                 embed_tokens: this.supports_fp16 ? 'fp16' : 'fp32',
                 vision_encoder: this.supports_fp16 ? 'fp16' : 'fp32',
@@ -42,8 +42,11 @@ class ModelSingleton {
                 decoder_model_merged: 'q4', // or 'fp16' or 'fp32'
             },
             device: 'webgpu',
-            progress_callback: progress_callback ?? undefined,
-        });
+        };
+        if (progress_callback) {
+            options.progress_callback = progress_callback;
+        }
+        this.model ??= Florence2ForConditionalGeneration.from_pretrained(this.model_id, options);
 
         return Promise.all([this.model, this.tokenizer, this.processor]);
     }
@@ -103,9 +106,9 @@ async function run({ text, url, task, language = 'English', conversation = [] }:
     }
 
     // Build an instruction prompt that includes the task, language and conversation
-    let user_input = task;
+    let user_input = task || '<MORE_DETAILED_CAPTION>';
     const convText = Array.isArray(conversation) && conversation.length ? conversation.join('\n') : (text || '');
-    if (TASKS_WITH_INPUTS.includes(task) && convText) {
+    if (TASKS_WITH_INPUTS.includes(user_input) && convText) {
         user_input += '\n' + convText;
     }
 
